@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DropVault — Access Files</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121a; --card: #1a1a26;
+      --border: rgba(255,255,255,0.08); --accent: #7c5cfc;
+      --accent2: #fc5c7d; --text: #f0eeff; --muted: #888899;
+      --success: #4ade80; --error: #f87171;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; bottom: -30%; right: -10%;
+      width: 70vw; height: 70vw;
+      background: radial-gradient(circle, rgba(252,92,125,0.09) 0%, transparent 65%);
+      pointer-events: none; z-index: 0;
+    }
+    nav {
+      position: relative; z-index: 10; display: flex; align-items: center;
+      justify-content: space-between; padding: 1.5rem 4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.4rem; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--accent); }
+    nav a.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+    nav a.back:hover { color: var(--text); }
+
+    .page { position: relative; z-index: 1; max-width: 600px; margin: 0 auto; padding: 3rem 1.5rem; }
+
+    h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 0.4rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2.5rem; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem; margin-bottom: 1.5rem;
+    }
+
+    .lock-icon {
+      text-align: center; font-size: 3rem; margin-bottom: 1.5rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+    input[type="text"] {
+      width: 100%; padding: 0.85rem 1rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1rem;
+      transition: border-color 0.2s; outline: none; margin-bottom: 1rem;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    .btn-access {
+      width: 100%; padding: 1rem; background: var(--accent); color: #fff;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 500;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-access:hover:not(:disabled) { background: #6a48f0; transform: translateY(-1px); }
+    .btn-access:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-box {
+      display: none; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 8px; padding: 1rem; color: var(--error); font-size: 0.9rem; margin-bottom: 1rem;
+    }
+    .error-box.show { display: block; }
+
+    /* File list result */
+    .result-wrap { display: none; }
+    .result-wrap.show { display: block; }
+
+    .result-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2);
+      border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+    }
+    .result-header span { color: var(--success); font-size: 1.2rem; }
+    .result-header p { color: var(--success); font-size: 0.9rem; }
+
+    .file-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .file-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+      transition: border-color 0.2s;
+    }
+    .file-card:hover { border-color: rgba(124,92,252,0.3); }
+
+    .file-thumb {
+      width: 48px; height: 48px; border-radius: 8px; object-fit: cover;
+      background: var(--card); display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; flex-shrink: 0;
+    }
+    .file-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+
+    .file-info { flex: 1; min-width: 0; }
+    .file-name { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
+
+    .file-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+    .btn-dl {
+      padding: 0.45rem 0.9rem; border-radius: 6px; font-size: 0.82rem;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 0.3rem; transition: all 0.2s;
+    }
+    .btn-dl-primary { background: var(--accent); color: #fff; border: none; }
+    .btn-dl-primary:hover { background: #6a48f0; }
+    .btn-dl-copy { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-dl-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+    .expiry-note {
+      text-align: center; margin-top: 1.5rem;
+      font-size: 0.82rem; color: var(--muted);
+    }
+
+    .loading { text-align: center; padding: 2rem; color: var(--muted); }
+    .spinner {
+      display: inline-block; width: 24px; height: 24px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">Drop<span>Vault</span></a>
+  <a href="upload.html" class="back">⬆ Upload Files →</a>
+</nav>
+
+<div class="page">
+  <h1>Access Files</h1>
+  <p class="subtitle">Enter the sender's name and secret key to unlock files.</p>
+
+  <div class="card">
+    <div class="lock-icon">🔐</div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <label for="senderName">Sender's Name</label>
+    <input type="text" id="senderName" placeholder="e.g. Rahul" />
+
+    <label for="accessKey">Secret Key</label>
+    <input type="text" id="accessKey" placeholder="e.g. myKey@2025"
+      onkeypress="if(event.key==='Enter') fetchFiles()" />
+
+    <button class="btn-access" id="accessBtn" onclick="fetchFiles()">
+      🔓 Unlock & Access Files
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingDiv" style="display:none;" class="card">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Verifying key...</p>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="result-wrap" id="resultWrap">
+    <div class="result-header">
+      <span>✓</span>
+      <div>
+        <p><strong>Access granted!</strong> Files are ready to download.</p>
+      </div>
+    </div>
+    <div class="file-grid" id="fileGrid"></div>
+    <div class="expiry-note" id="expiryNote"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://YOUR_RENDER_URL.onrender.com'; // 👈 replace after deploying backend
+
+function getFileIcon(type) {
+  if (!type) return '📎';
+  if (type.startsWith('image/')) return '🖼️';
+  if (type.startsWith('video/')) return '🎬';
+  if (type.startsWith('audio/')) return '🎵';
+  if (type.includes('pdf')) return '📄';
+  if (type.includes('zip') || type.includes('rar')) return '📦';
+  return '📎';
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+
+async function fetchFiles() {
+  const name = document.getElementById('senderName').value.trim();
+  const key = document.getElementById('accessKey').value.trim();
+  const errBox = document.getElementById('errorBox');
+  errBox.className = 'error-box';
+
+  if (!name || !key) { showError('Enter both the sender name and key.'); return; }
+
+  document.getElementById('accessBtn').disabled = true;
+  document.getElementById('loadingDiv').style.display = 'block';
+  document.getElementById('resultWrap').className = 'result-wrap';
+
+  try {
+    const res = await fetch(`${API}/api/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, key })
+    });
+    const data = await res.json();
+
+    document.getElementById('loadingDiv').style.display = 'none';
+
+    if (!res.ok) {
+      showError(data.error || 'Wrong key or name. Please try again.');
+      return;
+    }
+
+    renderFiles(data.files, data.createdAt);
+  } catch (err) {
+    document.getElementById('loadingDiv').style.display = 'none';
+    showError('Could not connect to server. Make sure backend is running!');
+  } finally {
+    document.getElementById('accessBtn').disabled = false;
+  }
+}
+
+function renderFiles(files, createdAt) {
+  const grid = document.getElementById('fileGrid');
+
+  grid.innerHTML = files.map(f => {
+    const isImage = f.type && f.type.startsWith('image/');
+    const thumb = isImage
+      ? `<div class="file-thumb"><img src="${f.url}" alt="${f.filename}" loading="lazy"/></div>`
+      : `<div class="file-thumb">${getFileIcon(f.type)}</div>`;
+
+    return `
+      <div class="file-card">
+        ${thumb}
+        <div class="file-info">
+          <div class="file-name">${f.filename}</div>
+          <div class="file-meta">${formatSize(f.size)}</div>
+        </div>
+        <div class="file-actions">
+          <button class="btn-dl btn-dl-copy" onclick="copyLink('${f.url}', this)">📋 Copy</button>
+          <a href="${f.url}" download="${f.filename}" class="btn-dl btn-dl-primary" target="_blank">⬇ Download</a>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (createdAt) {
+    const expiry = new Date(new Date(createdAt).getTime() + 2*24*60*60*1000);
+    const hours = Math.max(0, Math.round((expiry - Date.now()) / 3600000));
+    document.getElementById('expiryNote').textContent =
+      `⏱ Files expire in ~${hours} hours`;
+  }
+
+  document.getElementById('resultWrap').className = 'result-wrap show';
+}
+
+function copyLink(url, btn) {
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '⚠ ' + msg;
+  b.className = 'error-box show';
+}
+</script>
+</body>
+</html>

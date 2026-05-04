@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DropVault — Upload Files</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #12121a; --card: #1a1a26;
+      --border: rgba(255,255,255,0.08); --accent: #7c5cfc;
+      --accent2: #fc5c7d; --text: #f0eeff; --muted: #888899;
+      --success: #4ade80; --error: #f87171;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; top: -40%; left: -20%;
+      width: 80vw; height: 80vw;
+      background: radial-gradient(circle, rgba(124,92,252,0.1) 0%, transparent 65%);
+      pointer-events: none; z-index: 0;
+    }
+    nav {
+      position: relative; z-index: 10; display: flex; align-items: center;
+      justify-content: space-between; padding: 1.5rem 4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.4rem; text-decoration: none; color: var(--text); }
+    .logo span { color: var(--accent); }
+    nav a.back { color: var(--muted); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+    nav a.back:hover { color: var(--text); }
+
+    .page { position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 3rem 1.5rem; }
+
+    h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 2rem; margin-bottom: 0.4rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2.5rem; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem; margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+      margin-bottom: 1rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.06em; font-size: 0.75rem;
+    }
+
+    /* Drop zone */
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 3rem 2rem;
+      text-align: center; cursor: pointer; transition: all 0.3s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent); background: rgba(124,92,252,0.05);
+    }
+    .dropzone-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .dropzone h3 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+    .dropzone p { color: var(--muted); font-size: 0.85rem; }
+    .dropzone input { display: none; }
+
+    .btn-browse {
+      display: inline-block; margin-top: 1rem; padding: 0.5rem 1.2rem;
+      background: rgba(124,92,252,0.2); color: var(--accent);
+      border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+      border: 1px solid rgba(124,92,252,0.3); transition: all 0.2s;
+    }
+    .btn-browse:hover { background: rgba(124,92,252,0.3); }
+
+    /* File list */
+    .file-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+
+    .file-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.75rem 1rem;
+    }
+    .file-item-icon { font-size: 1.3rem; }
+    .file-item-info { flex: 1; min-width: 0; }
+    .file-item-name { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-item-size { font-size: 0.78rem; color: var(--muted); }
+    .file-item-remove {
+      background: none; border: none; color: var(--error);
+      cursor: pointer; padding: 0.2rem 0.5rem; border-radius: 4px;
+      font-size: 0.8rem; opacity: 0.7; transition: opacity 0.2s;
+    }
+    .file-item-remove:hover { opacity: 1; }
+
+    /* Size bar */
+    .size-bar-wrap { margin-top: 0.75rem; }
+    .size-bar-label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+    .size-bar-bg { background: var(--surface); border-radius: 100px; height: 6px; overflow: hidden; }
+    .size-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+    .size-bar-fill.over { background: var(--error); }
+
+    /* Inputs */
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.4rem; }
+    input[type="text"] {
+      width: 100%; padding: 0.8rem 1rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.95rem;
+      transition: border-color 0.2s; outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--muted); }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    .key-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.4rem; }
+    .key-strength { display: flex; gap: 4px; margin-top: 0.5rem; }
+    .ks-dot { width: 24px; height: 4px; border-radius: 2px; background: var(--border); transition: background 0.3s; }
+
+    /* Submit button */
+    .btn-upload {
+      width: 100%; padding: 1rem; background: var(--accent); color: #fff;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 500;
+      font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+    .btn-upload:hover:not(:disabled) { background: #6a48f0; transform: translateY(-1px); }
+    .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Progress */
+    .progress-wrap { display: none; }
+    .progress-wrap.active { display: block; }
+    .progress-bar-bg { background: var(--surface); border-radius: 100px; height: 8px; overflow: hidden; margin: 0.75rem 0; }
+    .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 100px; transition: width 0.4s; width: 0%; }
+    .progress-text { text-align: center; font-size: 0.85rem; color: var(--muted); }
+
+    /* Success */
+    .success-box {
+      display: none; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.3);
+      border-radius: 12px; padding: 1.5rem; text-align: center; margin-top: 1rem;
+    }
+    .success-box.show { display: block; }
+    .success-box h3 { color: var(--success); font-family: 'Syne', sans-serif; font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .success-box p { color: var(--muted); font-size: 0.9rem; }
+    .success-key {
+      display: inline-block; margin: 1rem auto; padding: 0.6rem 1.5rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; font-family: monospace; font-size: 1.1rem;
+      letter-spacing: 0.1em; color: var(--accent);
+    }
+
+    /* Error */
+    .error-box {
+      display: none; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 8px; padding: 1rem; color: var(--error); font-size: 0.9rem; margin-top: 0.5rem;
+    }
+    .error-box.show { display: block; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">Drop<span>Vault</span></a>
+  <a href="download.html" class="back">⬇ Access Files →</a>
+</nav>
+
+<div class="page">
+  <h1>Upload Files</h1>
+  <p class="subtitle">Set a key + your name. Share both with whoever needs access.</p>
+
+  <!-- Drop Zone -->
+  <div class="card">
+    <div class="card-title">Step 1 — Choose Files</div>
+    <div class="dropzone" id="dropzone">
+      <div class="dropzone-icon">📂</div>
+      <h3>Drop files here</h3>
+      <p>Photos, videos, documents — any file type</p>
+      <label class="btn-browse" for="fileInput">Browse Files</label>
+      <input type="file" id="fileInput" multiple />
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+
+    <div class="size-bar-wrap" id="sizeBarWrap" style="display:none;">
+      <div class="size-bar-label">
+        <span id="sizeUsed">0 MB used</span>
+        <span>5 GB max</span>
+      </div>
+      <div class="size-bar-bg">
+        <div class="size-bar-fill" id="sizeBar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key + Name -->
+  <div class="card">
+    <div class="card-title">Step 2 — Set Access Key & Name</div>
+    <div class="form-row">
+      <div>
+        <label for="senderName">Your Name</label>
+        <input type="text" id="senderName" placeholder="e.g. Rahul" />
+      </div>
+      <div>
+        <label for="accessKey">Secret Key</label>
+        <input type="text" id="accessKey" placeholder="e.g. myKey@2025" oninput="updateKeyStrength(this.value)" />
+        <div class="key-strength">
+          <div class="ks-dot" id="ks1"></div>
+          <div class="ks-dot" id="ks2"></div>
+          <div class="ks-dot" id="ks3"></div>
+          <div class="ks-dot" id="ks4"></div>
+        </div>
+        <div class="key-hint">Use letters, numbers, symbols for a stronger key</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">Uploading...</div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <button class="btn-upload" id="uploadBtn" onclick="handleUpload()">
+    ⬆ Upload & Generate Key
+  </button>
+
+  <div class="success-box" id="successBox">
+    <h3>✓ Files uploaded!</h3>
+    <p>Share this key and your name with the recipient:</p>
+    <div class="success-key" id="successKey"></div>
+    <p>Files will be deleted automatically after <strong>48 hours</strong>.</p>
+    <br/>
+    <a href="download.html" style="color: var(--accent); font-size:0.9rem;">→ Test access on download page</a>
+  </div>
+</div>
+
+<script>
+const API = 'https://YOUR_RENDER_URL.onrender.com'; // 👈 replace after deploying backend
+const MAX_SIZE = 5 * 1024 * 1024 * 1024;
+let selectedFiles = [];
+
+// Drag and drop
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('fileInput');
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  addFiles([...e.dataTransfer.files]);
+});
+fi.addEventListener('change', () => addFiles([...fi.files]));
+
+function addFiles(files) {
+  files.forEach(f => {
+    if (!selectedFiles.find(x => x.name === f.name && x.size === f.size)) {
+      selectedFiles.push(f);
+    }
+  });
+  renderFiles();
+}
+
+function removeFile(i) {
+  selectedFiles.splice(i, 1);
+  renderFiles();
+}
+
+function getFileIcon(type) {
+  if (type.startsWith('image/')) return '🖼️';
+  if (type.startsWith('video/')) return '🎬';
+  if (type.startsWith('audio/')) return '🎵';
+  if (type.includes('pdf')) return '📄';
+  if (type.includes('zip') || type.includes('rar')) return '📦';
+  return '📎';
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+}
+
+function renderFiles() {
+  const list = document.getElementById('fileList');
+  const totalSize = selectedFiles.reduce((s, f) => s + f.size, 0);
+  const pct = Math.min(100, (totalSize / MAX_SIZE) * 100);
+
+  list.innerHTML = selectedFiles.map((f, i) => `
+    <div class="file-item">
+      <span class="file-item-icon">${getFileIcon(f.type)}</span>
+      <div class="file-item-info">
+        <div class="file-item-name">${f.name}</div>
+        <div class="file-item-size">${formatSize(f.size)}</div>
+      </div>
+      <button class="file-item-remove" onclick="removeFile(${i})">✕ Remove</button>
+    </div>
+  `).join('');
+
+  if (selectedFiles.length > 0) {
+    document.getElementById('sizeBarWrap').style.display = 'block';
+    document.getElementById('sizeUsed').textContent = formatSize(totalSize) + ' used';
+    const bar = document.getElementById('sizeBar');
+    bar.style.width = pct + '%';
+    bar.classList.toggle('over', totalSize > MAX_SIZE);
+  } else {
+    document.getElementById('sizeBarWrap').style.display = 'none';
+  }
+}
+
+function updateKeyStrength(key) {
+  let score = 0;
+  if (key.length >= 4) score++;
+  if (key.length >= 8) score++;
+  if (/[0-9]/.test(key)) score++;
+  if (/[^a-zA-Z0-9]/.test(key)) score++;
+  const colors = ['#f87171','#fb923c','#facc15','#4ade80'];
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById('ks' + i);
+    dot.style.background = i <= score ? colors[score-1] : 'var(--border)';
+  }
+}
+
+async function handleUpload() {
+  const name = document.getElementById('senderName').value.trim();
+  const key = document.getElementById('accessKey').value.trim();
+  const errBox = document.getElementById('errorBox');
+  errBox.className = 'error-box';
+
+  if (!name) { showError('Please enter your name.'); return; }
+  if (!key) { showError('Please set a secret key.'); return; }
+  if (key.length < 3) { showError('Key must be at least 3 characters.'); return; }
+  if (selectedFiles.length === 0) { showError('Please select at least one file.'); return; }
+
+  const totalSize = selectedFiles.reduce((s, f) => s + f.size, 0);
+  if (totalSize > MAX_SIZE) { showError('Total file size exceeds 5GB limit.'); return; }
+
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = true;
+  document.getElementById('progressWrap').className = 'progress-wrap active';
+
+  const formData = new FormData();
+  formData.append('name', name);
+  formData.append('key', key);
+  selectedFiles.forEach(f => formData.append('files', f));
+
+  try {
+    simulateProgress();
+    const res = await fetch(`${API}/api/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+
+    document.getElementById('progressBar').style.width = '100%';
+    document.getElementById('progressText').textContent = 'Upload complete!';
+
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+    document.getElementById('successKey').textContent = `Key: ${key}  |  Name: ${name}`;
+    document.getElementById('successBox').className = 'success-box show';
+    btn.style.display = 'none';
+  } catch (err) {
+    showError('Upload failed: ' + err.message + '. Make sure the backend is running!');
+    btn.disabled = false;
+    document.getElementById('progressWrap').className = 'progress-wrap';
+  }
+}
+
+function simulateProgress() {
+  let p = 0;
+  const bar = document.getElementById('progressBar');
+  const txt = document.getElementById('progressText');
+  const interval = setInterval(() => {
+    p = Math.min(p + Math.random() * 8, 90);
+    bar.style.width = p + '%';
+    txt.textContent = `Uploading... ${Math.round(p)}%`;
+    if (p >= 90) clearInterval(interval);
+  }, 200);
+}
+
+function showError(msg) {
+  const b = document.getElementById('errorBox');
+  b.textContent = '⚠ ' + msg;
+  b.className = 'error-box show';
+}
+</script>
+</body>
+</html>
